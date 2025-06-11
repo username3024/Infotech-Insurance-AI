@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 
 class RestaurantApplication:
     def __init__(self,
@@ -17,7 +17,7 @@ class RestaurantApplication:
                  has_catering_operations: bool,
                  seating_capacity: int,
                  annual_revenue: float,
-                 health_inspection_score: float,
+                 health_inspection_score: float, # This is from application form
                  previous_claims_count: int):
         self.application_id: str = application_id
         self.business_name: str = business_name
@@ -34,10 +34,10 @@ class RestaurantApplication:
         self.has_catering_operations: bool = has_catering_operations
         self.seating_capacity: int = seating_capacity
         self.annual_revenue: float = annual_revenue
-        self.health_inspection_score: float = health_inspection_score
+        self.health_inspection_score: float = health_inspection_score # Score from application
         self.previous_claims_count: int = previous_claims_count
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         return self.__dict__
 
 class RiskAssessmentOutput:
@@ -50,7 +50,9 @@ class RiskAssessmentOutput:
                  premium_breakdown: Dict[str, float],
                  risk_mitigation_recommendations: List[str],
                  required_documentation: List[str],
-                 explanation_factors: List[str]):
+                 explanation_factors: List[str],
+                 health_inspection_summary: Optional[Dict[str, Any]] = None,
+                 crime_statistics_summary: Optional[Dict[str, Any]] = None):
         self.application_id: str = application_id
         self.risk_score: float = risk_score
         self.confidence_level: float = confidence_level
@@ -60,6 +62,24 @@ class RiskAssessmentOutput:
         self.risk_mitigation_recommendations: List[str] = risk_mitigation_recommendations
         self.required_documentation: List[str] = required_documentation
         self.explanation_factors: List[str] = explanation_factors
+        self.health_inspection_summary: Optional[Dict[str, Any]] = health_inspection_summary
+        self.crime_statistics_summary: Optional[Dict[str, Any]] = crime_statistics_summary
 
-    def to_dict(self) -> Dict:
-        return self.__dict__
+    def to_dict(self) -> Dict[str, Any]:
+        # Ensure all attributes, including optional ones, are included if they exist
+        data = {
+            "application_id": self.application_id,
+            "risk_score": self.risk_score,
+            "confidence_level": self.confidence_level,
+            "decision": self.decision,
+            "recommended_premium": self.recommended_premium,
+            "premium_breakdown": self.premium_breakdown,
+            "risk_mitigation_recommendations": self.risk_mitigation_recommendations,
+            "required_documentation": self.required_documentation,
+            "explanation_factors": self.explanation_factors,
+        }
+        if self.health_inspection_summary is not None:
+            data["health_inspection_summary"] = self.health_inspection_summary
+        if self.crime_statistics_summary is not None:
+            data["crime_statistics_summary"] = self.crime_statistics_summary
+        return data
