@@ -35,7 +35,7 @@ This document provides detailed information about the API endpoints available in
 
     *   `application_id: string` - Unique identifier for the submitted application.
     *   `risk_score: float` - The calculated risk score (e.g., on a 1-10 scale), influenced by application data and mock external data.
-    *   `confidence_level: float` - (Placeholder, e.g., 0.75) Confidence in the assessment.
+    *   `confidence_level: float` - (Placeholder, e.g., 0.70) Confidence in the assessment.
     *   `decision: string` - The underwriting decision (e.g., "Approved", "Declined", "Refer to manual underwriter").
     *   `recommended_premium: float` - The total recommended insurance premium.
     *   `premium_breakdown: object` - Breakdown of the premium:
@@ -44,18 +44,21 @@ This document provides detailed information about the API endpoints available in
     *   `risk_mitigation_recommendations: array of strings` - (Placeholder) Suggestions to mitigate risks.
     *   `required_documentation: array of strings` - (Placeholder) List of documents required to proceed.
     *   `explanation_factors: array of strings` - (Placeholder) Key factors influencing the assessment, may include notes on external data.
-    *   `health_inspection_summary: object (optional)` - Contains summary of health inspection data from the mock client. Structure detailed below. Can be `null` if the client call fails or returns no data.
-    *   `crime_statistics_summary: object (optional)` - Contains summary of crime statistics data from the mock client. Structure detailed below. Can be `null` if the client call fails or returns no data.
+    *   `health_inspection_summary: object (optional)` - Contains summary of health inspection data from the `SimulatedHealthInspectionClient`. Structure detailed below. Can be `null` if the client call fails or if data is not found (in which case, `error` field might be present).
+    *   `crime_statistics_summary: object (optional)` - Contains summary of crime statistics data from the `MockCrimeStatisticsClient`. Structure detailed below. Can be `null` if the client call fails.
 
-    **`health_inspection_summary` Object Structure:**
-    *   `latest_score: number` - The latest health inspection score from the mock source.
-    *   `last_inspection_date: string (date)` - Date of the last mock inspection.
-    *   `critical_violations_last_year: integer` - Number of critical violations in the last year (mock data).
-    *   `non_critical_violations_last_year: integer` - Number of non-critical violations (mock data, if present).
-    *   `summary_url: string (url)` - URL to a mock inspection summary (if present).
-    *   `source: string` - Indicates the source of the data (e.g., "mock_health_department_api").
+    **`health_inspection_summary` Object Structure (from `SimulatedHealthInspectionClient`):**
+    *   `latest_score: number (nullable)` - The latest health inspection score from the simulated source. `null` if establishment not found.
+    *   `last_inspection_date: string (date, nullable)` - Date of the last simulated inspection.
+    *   `critical_violations_last_year: integer (nullable)` - Number of critical violations in the last year (from simulated data). `null` if establishment not found.
+    *   `grade: string (nullable)` - Health grade (e.g., "A", "B", "C").
+    *   `status: string (nullable)` - Inspection status (e.g., "Pass", "Fail").
+    *   `all_violations_count_last_inspection: integer (nullable)` - Total number of violations in the last simulated inspection.
+    *   `source: string` - Indicates the source of the data (e.g., "simulated_health_api_v2", "simulated_health_api_not_found", "simulated_health_api_error").
+    *   `establishment_id_debug: string (nullable)` - Internal ID from the simulated data source, for debugging.
+    *   `error: string (optional)` - Present if there was an error fetching or processing data (e.g., "Invalid API Key", "Establishment not found", "Simulated data not loaded").
 
-    **`crime_statistics_summary` Object Structure:**
+    **`crime_statistics_summary` Object Structure (from `MockCrimeStatisticsClient`):**
     *   `crime_level_area: string` - General crime level in the area (e.g., "Low", "Medium", "High") from mock source.
     *   `theft_incidents_last_year_nearby: integer` - Number of theft incidents (mock data).
     *   `vandalism_incidents_last_year_nearby: integer` - Number of vandalism incidents (mock data).
@@ -65,19 +68,19 @@ This document provides detailed information about the API endpoints available in
 
 *   **Error Responses:**
     *   `400 Bad Request`: Returned if the request payload is malformed, missing required fields, or contains invalid data types. Response body: `{"error": "description"}`.
-    *   `500 Internal Server Error`: Returned if an unexpected error occurs on the server during processing (e.g., an unhandled exception in core logic, though client errors are handled gracefully by proceeding with `null` data).
+    *   `500 Internal Server Error`: Returned if an unexpected error occurs on the server during processing.
 
 ---
 
 ## Endpoint: Get Assessment Results
 
-*   **Description:** Retrieves the full assessment results for a previously submitted application using its unique application ID. This includes any data retrieved from mock external sources.
+*   **Description:** Retrieves the full assessment results for a previously submitted application using its unique application ID. This includes any data retrieved from external sources.
 *   **Method:** `GET`
 *   **URL:** `/assessment/<string:application_id>`
 *   **Path Parameters:**
     *   `application_id: string (required)` - The unique identifier of the application.
 *   **Success Response (`200 OK`):**
-    The response body will be a JSON object with the same structure as the success response for `POST /applications/submit` (i.e., the `RiskAssessmentOutput`, including `health_inspection_summary` and `crime_statistics_summary` if they were captured).
+    The response body will be a JSON object with the same structure as the success response for `POST /applications/submit` (i.e., the `RiskAssessmentOutput`, including `health_inspection_summary` and `crime_statistics_summary` as detailed above).
 *   **Error Responses:**
     *   `404 Not Found`: Returned if no assessment is found for the provided `application_id`. Response body: `{"error": "Assessment not found for this application ID"}`.
 
@@ -96,4 +99,4 @@ This document provides detailed information about the API endpoints available in
     *   `404 Not Found`: Returned if no application data is found for the provided `application_id`. Response body: `{"error": "Application not found"}`.
 
 ---
-For details on the behavior of the mock external clients, see `external_sources.md`.
+For details on the behavior of the simulated and mock external clients, see `external_sources.md`.

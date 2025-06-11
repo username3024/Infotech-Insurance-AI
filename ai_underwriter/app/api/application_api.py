@@ -1,24 +1,44 @@
 import uuid
-import logging # Added
+import logging
+import os # Added
 from flask import Blueprint, request, jsonify
 from app.models.data_models import RestaurantApplication, RiskAssessmentOutput
 from app.core import calculate_risk_score, calculate_premium, make_decision
-from app.clients import MockHealthInspectionClient, MockCrimeStatisticsClient # Added
+# Updated to include SimulatedHealthInspectionClient
+from app.clients import SimulatedHealthInspectionClient, MockCrimeStatisticsClient
 
 application_bp = Blueprint('application_api', __name__, url_prefix='/applications')
-logger = logging.getLogger(__name__) # Added module-level logger
+logger = logging.getLogger(__name__)
 
 # In-memory storage for MVP
 submitted_applications = {}
 assessment_results = {}
 
-# Instantiate Clients
-# Placeholder for API keys - in a real app, use config/env variables
-HEALTH_API_KEY = "your_health_api_key_here_if_needed"
-CRIME_API_KEY = "your_crime_api_key_here_if_needed"
+# --- Client Instantiation with Environment Variable for API Keys ---
+# For SimulatedHealthInspectionClient, an actual key isn't strictly needed for local file access,
+# but we implement the pattern. It can use this key for simulated checks if desired.
+# The default in os.environ.get() is None, which means the client's __init__ default will be used if env var is missing.
+HEALTH_API_KEY_FROM_ENV = os.environ.get('HEALTH_API_KEY')
+logger.info(f"HEALTH_API_KEY from environment: {'SET' if HEALTH_API_KEY_FROM_ENV else 'NOT SET'}")
 
-health_inspection_client = MockHealthInspectionClient(api_key=HEALTH_API_KEY)
-crime_statistics_client = MockCrimeStatisticsClient(api_key=CRIME_API_KEY)
+
+# For MockCrimeStatisticsClient, it's also conceptual as it's a mock.
+CRIME_API_KEY_FROM_ENV = os.environ.get('CRIME_API_KEY')
+logger.info(f"CRIME_API_KEY from environment: {'SET' if CRIME_API_KEY_FROM_ENV else 'NOT SET'}")
+
+# Instantiate the new SimulatedHealthInspectionClient
+# The base_url is also conceptual for the simulated client.
+health_inspection_client = SimulatedHealthInspectionClient(
+    base_url="http://simulated.healthdept.api", # Example base URL, not used by file-based sim
+    api_key=HEALTH_API_KEY_FROM_ENV
+    # data_file_path will use its default from __init__
+)
+
+# MockCrimeStatisticsClient remains as is, but now uses env var for its key
+crime_statistics_client = MockCrimeStatisticsClient(
+    api_key=CRIME_API_KEY_FROM_ENV
+)
+# --- End Client Instantiation ---
 
 
 @application_bp.route('/submit', methods=['POST'])
@@ -29,7 +49,6 @@ def submit_application():
         logger.warning("Submit attempt with no input data.")
         return jsonify({"error": "No input data provided"}), 400
 
-    # Pre-validation for required fields
     required_fields = [
         'business_name', 'address', 'cuisine_type', 'alcohol_sales_percentage',
         'operating_hours', 'square_footage', 'building_age', 'fire_suppression_system_type',
@@ -43,33 +62,36 @@ def submit_application():
         return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
 
     application_id = uuid.uuid4().hex
-    data_with_id = {**data, 'application_id': application_id} # Create a new dict with ID
+    data_with_id = {**data, 'application_id': application_id}
 
     try:
         app_data = RestaurantApplication(**data_with_id)
     except TypeError as e:
-        logger.error(f"Error creating RestaurantApplication: {e}", exc_info=True)
+        logger.error(f"Error creating RestaurantApplication for ID {application_id}: {e}", exc_info=True)
         return jsonify({"error": f"Invalid application data format: {str(e)}"}), 400
     except Exception as e:
-        logger.error(f"Unexpected error during application object creation: {e}", exc_info=True)
+        logger.error(f"Unexpected error during application object creation for ID {application_id}: {e}", exc_info=True)
         return jsonify({"error": f"An unexpected error occurred during application creation: {str(e)}"}), 500
 
-    # Store raw application data
     submitted_applications[application_id] = app_data.to_dict()
     logger.info(f"Application {application_id} ({app_data.business_name}) stored.")
 
-    # Fetch External Data
-    logger.info(f"Fetching external data for application ID: {app_data.application_id}...")
+    logger.info(f"Fetching external data for application ID: {application_id}...")
     health_data_summary = None
     try:
+        # SimulatedHealthInspectionClient's get_inspection_data might require city, state, zip
+        # For now, passing them as None if not readily available from app_data.
+        # Modify if app_data.address needs parsing or if these fields are added to RestaurantApplication.
         health_data_summary = health_inspection_client.get_inspection_data(
             address=app_data.address,
-            business_name=app_data.business_name
+            business_name=app_data.business_name,
+            city=None, # Assuming city is not directly in app_data.address for now
+            state=None, # Assuming state is not directly in app_data.address
+            zip_code=None # Assuming zip is not directly in app_data.address
         )
         logger.info(f"Health data received for {application_id}: {health_data_summary}")
     except Exception as e:
         logger.error(f"Error fetching health inspection data for {application_id}: {e}", exc_info=True)
-        # Proceeding with None health_data_summary
 
     crime_data_summary = None
     try:
@@ -79,13 +101,11 @@ def submit_application():
         logger.info(f"Crime data received for {application_id}: {crime_data_summary}")
     except Exception as e:
         logger.error(f"Error fetching crime statistics data for {application_id}: {e}", exc_info=True)
-        # Proceeding with None crime_data_summary
 
-    # Perform assessment
     try:
         logger.info(f"Calculating risk score for {application_id} with external data...")
         risk_score = calculate_risk_score(
-            application=app_data, # Corrected variable name
+            application=app_data,
             health_data=health_data_summary,
             crime_data=crime_data_summary
         )
@@ -101,8 +121,6 @@ def submit_application():
         logger.error(f"Error during assessment process for {application_id}: {e}", exc_info=True)
         return jsonify({"error": f"Error during assessment process: {str(e)}", "application_id": application_id}), 500
 
-    # Construct RiskAssessmentOutput
-    # Using some existing placeholder logic and adding new fields
     current_explanation_factors = [
             f"Calculated risk score: {risk_score:.2f}",
             f"Decision based on risk score: {decision}",
@@ -110,30 +128,33 @@ def submit_application():
             f"Years in business ({app_data.years_in_business}) considered.",
             f"Alcohol sales percentage ({app_data.alcohol_sales_percentage*100}%) considered."
     ]
-    if health_data_summary:
+    if health_data_summary and not health_data_summary.get("error"): # Add factor if data is valid
         current_explanation_factors.append(f"Health score from external source: {health_data_summary.get('latest_score', 'N/A')}")
-    if crime_data_summary:
+    elif health_data_summary and health_data_summary.get("error"):
+         current_explanation_factors.append(f"Health data error: {health_data_summary.get('error')}")
+    if crime_data_summary and not crime_data_summary.get("error"): # Add factor if data is valid
         current_explanation_factors.append(f"Area crime level from external source: {crime_data_summary.get('crime_level_area', 'N/A')}")
+    elif crime_data_summary and crime_data_summary.get("error"):
+        current_explanation_factors.append(f"Crime data error: {crime_data_summary.get('error')}")
 
 
     assessment_output = RiskAssessmentOutput(
         application_id=app_data.application_id,
         risk_score=risk_score,
-        confidence_level=0.75,  # Adjusted placeholder
+        confidence_level=0.70,  # Slightly adjusted placeholder
         decision=decision,
-        recommended_premium=premium_details["total_premium"],
-        premium_breakdown={ # Ensure safe access to keys from premium_details if their structure can vary
+        recommended_premium=premium_details.get("total_premium", 0.0), # Ensure default
+        premium_breakdown={
             "general_liability": premium_details.get("general_liability_premium", 0.0),
             "property": premium_details.get("property_premium", 0.0)
         },
-        risk_mitigation_recommendations=["Review safety protocols.", "Ensure compliance with all local health and safety codes."], # Updated placeholder
-        required_documentation=["Copy of valid business license.", "Proof of latest health inspection."], # Updated placeholder
+        risk_mitigation_recommendations=["Review safety protocols.", "Ensure compliance with all local health and safety codes."],
+        required_documentation=["Copy of valid business license.", "Proof of latest health inspection if available from external source."],
         explanation_factors=current_explanation_factors,
         health_inspection_summary=health_data_summary,
         crime_statistics_summary=crime_data_summary
     )
 
-    # Store assessment results
     assessment_results[application_id] = assessment_output.to_dict()
     logger.info(f"Assessment for {application_id} completed and stored.")
 
@@ -141,7 +162,6 @@ def submit_application():
 
 @application_bp.route('/<string:application_id>', methods=['GET'])
 def get_application(application_id: str):
-    """Retrieves the originally submitted application data."""
     logger.info(f"Attempting to retrieve raw application data for ID: {application_id}")
     application_data = submitted_applications.get(application_id)
     if application_data:
@@ -151,7 +171,6 @@ def get_application(application_id: str):
 
 @application_bp.route('/assessment/<string:application_id>', methods=['GET'])
 def get_assessment(application_id: str):
-    """Retrieves the assessment results for a given application ID."""
     logger.info(f"Attempting to retrieve assessment results for ID: {application_id}")
     result = assessment_results.get(application_id)
     if result:
@@ -159,7 +178,5 @@ def get_assessment(application_id: str):
     logger.warning(f"Assessment results for ID: {application_id} not found.")
     return jsonify({"error": "Assessment not found for this application ID"}), 404
 
-# Ensure the global logger is configured if not done in main.py already for some reason
-# This is mainly for direct execution or testing of this blueprint if main.py isn't the entry point.
 if not logging.getLogger().hasHandlers():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')

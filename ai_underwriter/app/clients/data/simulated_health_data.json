@@ -1,0 +1,80 @@
+[
+  {
+    "establishment_id": "EST_RN001",
+    "business_name": "The Risky Diner",
+    "address": "101 Danger Path, Badtown, FS 54321",
+    "search_keywords": ["101 danger path"],
+    "last_inspection": {
+      "inspection_id": "INSP_RD001",
+      "inspection_date": "2023-03-15",
+      "inspection_type": "Routine",
+      "score": 65,
+      "grade": "C",
+      "status": "Fail",
+      "inspector_notes": "Multiple critical violations observed. Follow-up mandatory.",
+      "violations": [
+        {
+          "violation_code": "02A", "description": "Improper food temperature control.", "severity": "Critical", "corrective_action": "Food discarded.", "repeat_offense": true
+        },
+        {
+          "violation_code": "04L", "description": "Food contact surfaces not properly sanitized.", "severity": "Critical", "corrective_action": "Immediate cleaning ordered.", "repeat_offense": false
+        },
+        {
+          "violation_code": "08B", "description": "Evidence of pest activity.", "severity": "Critical", "corrective_action": "Pest control service required.", "repeat_offense": true
+        }
+      ],
+      "follow_up_required": true,
+      "follow_up_date": "2023-03-30"
+    },
+    "historical_summary": { "critical_violations_last_12_months": 5 },
+    "data_source_details": { "api_version": "sim_v1", "retrieved_at": "2023-10-27T11:00:00Z" }
+  },
+  {
+    "establishment_id": "EST_SC002",
+    "business_name": "Super Clean Eats",
+    "address": "202 Sparkle Ave, Goodville, FS 12345",
+    "search_keywords": ["202 sparkle ave"],
+    "last_inspection": {
+      "inspection_id": "INSP_SC001",
+      "inspection_date": "2023-11-10",
+      "inspection_type": "Routine",
+      "score": 98,
+      "grade": "A",
+      "status": "Pass",
+      "inspector_notes": "Excellent hygiene standards.",
+      "violations": [
+        {
+          "violation_code": "15A", "description": "Light fixture not shielded.", "severity": "Non-Critical", "corrective_action": "Scheduled for fix.", "repeat_offense": false
+        }
+      ],
+      "follow_up_required": false
+    },
+    "historical_summary": { "critical_violations_last_12_months": 0 },
+    "data_source_details": { "api_version": "sim_v1", "retrieved_at": "2023-10-27T11:05:00Z" }
+  },
+  {
+    "establishment_id": "EST_AV003",
+    "business_name": "Average Joe's Diner",
+    "address": "303 Normal St, Midburg, FS 67890",
+    "search_keywords": ["303 normal st"],
+    "last_inspection": {
+      "inspection_id": "INSP_AV001",
+      "inspection_date": "2023-08-20",
+      "inspection_type": "Routine",
+      "score": 85,
+      "grade": "B",
+      "status": "Pass",
+      "violations": [
+        {
+          "violation_code": "06C", "description": " Improperly stored wiping cloths.", "severity": "Non-Critical", "corrective_action": "Staff retrained.", "repeat_offense": false
+        },
+        {
+          "violation_code": "04N", "description": "Single-use items reused.", "severity": "Critical", "corrective_action": "Items discarded, policy reviewed.", "repeat_offense": false
+        }
+      ],
+      "follow_up_required": false
+    },
+    "historical_summary": { "critical_violations_last_12_months": 1 },
+    "data_source_details": { "api_version": "sim_v1", "retrieved_at": "2023-10-27T11:10:00Z" }
+  }
+]
